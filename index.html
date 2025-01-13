@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Navigator - Smooth & Polished Location Tracker</title>
+
+    <!-- Leaflet CSS for Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <!-- Custom Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <h1>Global Navigator</h1>
+        <p>Track your live location and explore the world effortlessly.</p>
+    </header>
+
+    <main>
+        <div class="controls">
+            <button id="navigateButton" class="control-button">Start Navigation</button>
+
+            <!-- Corrected Accessible Select Element with Label -->
+            <label for="mapStyleSelect" class="visually-hidden">Select Map Style</label>
+            <select id="mapStyleSelect" class="control-select" title="Select Map Style">
+                <option value="street">Street View</option>
+                <option value="satellite">Satellite View</option>
+            </select>
+        </div>
+
+        <div id="map" style="height: 600px; margin-top: 10px;"></div>
+    </main>
+
+    <!-- Leaflet JS for Maps -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        // Initialize the map with a global view
+        var map = L.map('map').setView([20, 0], 2);
+
+        // Base layers for street and satellite views
+        var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        var satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            maxZoom: 19,
+            attribution: '&copy; Google Maps Satellite'
+        });
+
+        // Map style toggle functionality
+        document.getElementById('mapStyleSelect').addEventListener('change', function () {
+            if (this.value === 'satellite') {
+                map.removeLayer(streetLayer);
+                map.addLayer(satelliteLayer);
+            } else {
+                map.removeLayer(satelliteLayer);
+                map.addLayer(streetLayer);
+            }
+        });
+
+        // Navigation tracking control variables
+        var tracking = false;
+        var currentMarker;
+
+        // Function to update location on the map
+        function updateLocation(e) {
+            var latlng = e.latlng;
+
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+            }
+
+            currentMarker = L.marker(latlng).addTo(map)
+                .bindPopup("You are here: " + latlng.toString())
+                .openPopup();
+
+            map.setView(latlng, 16);
+        }
+
+        // Toggle navigation tracking
+        document.getElementById('navigateButton').addEventListener('click', function () {
+            tracking = !tracking;
+            if (tracking) {
+                map.locate({ setView: true, watch: true, maxZoom: 16, enableHighAccuracy: true });
+                this.textContent = "Stop Navigation";
+            } else {
+                map.stopLocate();
+                this.textContent = "Start Navigation";
+            }
+        });
+
+        // Handle location updates and errors
+        map.on('locationfound', updateLocation);
+        map.on('locationerror', function () {
+            alert("Unable to access your location.");
+        });
+    </script>
+</body>
+</html>
