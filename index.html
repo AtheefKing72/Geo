@@ -1,18 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta name="google-adsense-account" content="ca-pub-4487648195542576">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Location Navigator with Search & Satellite View</title>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4487648195542576"
-     crossorigin="anonymous"></script>
+    <title>Advanced Location Navigator with Auto-Complete & Geolocation</title>
+
     <!-- Leaflet CSS for Maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
-    <!-- Leaflet Search Plugin CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-
+    <!-- Leaflet GeoSearch CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch/dist/geosearch.css" />
     <!-- Custom Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
 
@@ -20,7 +16,6 @@
         body {
             font-family: 'Roboto', sans-serif;
             margin: 0;
-            padding: 0;
             text-align: center;
             background-color: #f3f4f6;
         }
@@ -54,6 +49,7 @@
         .control-button {
             background-color: #007BFF;
             color: white;
+            border: none;
         }
         .control-button:hover {
             background-color: #0056b3;
@@ -78,18 +74,19 @@
 <body>
     <header>
         <h1>Advanced Location Navigator</h1>
-        <p>Track your live location and search any place in the world.</p>
-        <input id="searchLocation" type="text" placeholder="Enter location (e.g., city, country)" class="control-select">
+        <p>Track your live location, search any place, and switch between map styles.</p>
     </header>
 
     <main>
         <div class="controls">
             <button id="navigateButton" class="control-button">Start Navigation</button>
             <button id="followToggle" class="control-button">Auto-Follow: Off</button>
-            <select id="mapStyleSelect" class="control-select" aria-label="Select Map Style">
-                <option value="street">Street View</option>
-                <option value="satellite">Satellite View</option>
-            </select>
+            <label for="mapStyleSelect">Select Map Style:</label>
+<select id="mapStyleSelect" class="control-select">
+    <option value="street">Street View</option>
+    <option value="satellite">Satellite View</option>
+</select>
+
         </div>
         <input type="text" id="searchLocation" class="search-input" placeholder="Search location..." />
 
@@ -99,11 +96,11 @@
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-    <!-- Leaflet Geocoder for Search Functionality -->
-    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <!-- Leaflet GeoSearch JS -->
+    <script src="https://unpkg.com/leaflet-geosearch/dist/geosearch.umd.js"></script>
 
     <script>
+        // Initialize Map
         let map = L.map('map').setView([20, 0], 2);
         let tracking = false, autoFollow = false;
         let currentMarker, accuracyCircle;
@@ -183,19 +180,29 @@
 
         map.on('locationfound', updateLocation);
 
-        // Add Geocoder (Search Location)
-        let geocoder = L.Control.geocoder({
-            defaultMarkGeocode: false
-        })
-            .on('markgeocode', function (e) {
-                let bbox = e.geocode.bbox;
-                let bounds = L.latLngBounds(bbox.getSouthWest(), bbox.getNorthEast());
-                map.fitBounds(bounds);
-                if (currentMarker) map.removeLayer(currentMarker);
-                currentMarker = L.marker(e.geocode.center).addTo(map)
-                    .bindPopup(e.geocode.name).openPopup();
-            })
-            .addTo(map);
+        // Auto-Complete Search Setup
+        const provider = new GeoSearch.OpenStreetMapProvider();
+        const searchControl = new GeoSearch.GeoSearchControl({
+            provider: provider,
+            style: 'bar',
+            autoComplete: true,
+            autoCompleteDelay: 300,
+            showMarker: true,
+            marker: {
+                icon: new L.Icon.Default(),
+                draggable: false,
+            }
+        });
+        map.addControl(searchControl);
+
+        // Show markers for search results
+        map.on('geosearch/showlocation', (result) => {
+            if (currentMarker) map.removeLayer(currentMarker);
+            currentMarker = L.marker([result.location.y, result.location.x])
+                .addTo(map)
+                .bindPopup(result.location.label)
+                .openPopup();
+        });
     </script>
 </body>
 </html>
