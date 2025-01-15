@@ -4,7 +4,7 @@
     <meta name="google-adsense-account" content="ca-pub-4487648195542576">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Navigator - Smooth & Polished Location Tracker</title>
+    <title>Advanced Global Navigator - Real-Time Location Tracker</title>
 
     <!-- Leaflet CSS for Maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -13,7 +13,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
 
     <style>
-        /* Basic Styling */
         body {
             font-family: 'Roboto', sans-serif;
             margin: 0;
@@ -21,26 +20,20 @@
             text-align: center;
             background-color: #f3f4f6;
         }
-
         header {
             background-color: #4CAF50;
             color: white;
-            padding: 20px 10px;
+            padding: 20px;
         }
-
-        h1 {
-            font-weight: 700;
-        }
-
-        p {
-            font-weight: 300;
-            font-size: 16px;
-        }
-
         main {
             padding: 10px;
         }
-
+        #map {
+            width: 100%;
+            height: 600px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
         .controls {
             display: flex;
             justify-content: center;
@@ -48,143 +41,110 @@
             gap: 15px;
             margin-bottom: 10px;
         }
-
         .control-button, .control-select {
-            padding: 10px 15px;
+            padding: 10px;
             font-size: 16px;
-            border: none;
             border-radius: 5px;
             cursor: pointer;
         }
-
         .control-button {
             background-color: #007BFF;
             color: white;
         }
-
         .control-button:hover {
             background-color: #0056b3;
         }
-
-        .control-select {
-            background-color: white;
-            border: 1px solid #ccc;
-        }
-
-        #map {
-            width: 100%;
-            height: 600px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .visually-hidden {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            border: 0;
+        .info-box {
+            margin-top: 15px;
+            font-size: 14px;
+            padding: 10px;
+            background-color: #f3f3f3;
+            border-radius: 5px;
         }
     </style>
-
-    <!-- Google Ads -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4487648195542576" crossorigin="anonymous"></script>
-    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-4487648195542576" data-ad-slot="4683928617" data-ad-format="auto" data-full-width-responsive="true"></ins>
-    <script>
-        (adsbygoogle = window.adsbygoogle || []).push({});
-    </script>
 </head>
 
 <body>
     <header>
-        <h1>Global Navigator</h1>
-        <p>Track your live location and explore the world effortlessly.</p>
+        <h1>Advanced Global Navigator</h1>
+        <p>Track your live location and explore enhanced features.</p>
     </header>
 
     <main>
         <div class="controls">
             <button id="navigateButton" class="control-button">Start Navigation</button>
-
-            <!-- Corrected Accessible Select Element with Label -->
-            <label for="mapStyleSelect" class="visually-hidden">Select Map Style</label>
-            <select id="mapStyleSelect" class="control-select" title="Select Map Style">
-                <option value="street">Street View</option>
-                <option value="satellite">Satellite View</option>
-            </select>
+            <button id="followToggle" class="control-button">Auto-Follow: Off</button>
         </div>
-
-        <div id="map" style="height: 600px; margin-top: 10px;"></div>
+        <div id="map"></div>
+        <div class="info-box" id="locationInfo">No location data available.</div>
     </main>
 
-    <!-- Leaflet JS for Maps -->
+    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-        // Initialize the map with a global view
-        var map = L.map('map').setView([20, 0], 2);
+        let map = L.map('map').setView([20, 0], 2);
+        let tracking = false, autoFollow = false;
+        let currentMarker, accuracyCircle;
 
-        // Base layers for street and satellite views
-        var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
+        // Base Layers
+        let streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        var satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-            maxZoom: 19,
-            attribution: '&copy; Google Maps Satellite'
-        });
-
-        // Map style toggle functionality
-        document.getElementById('mapStyleSelect').addEventListener('change', function () {
-            if (this.value === 'satellite') {
-                map.removeLayer(streetLayer);
-                map.addLayer(satelliteLayer);
-            } else {
-                map.removeLayer(satelliteLayer);
-                map.addLayer(streetLayer);
-            }
-        });
-
-        // Navigation tracking control variables
-        var tracking = false;
-        var currentMarker;
-
-        // Function to update location on the map
-        function updateLocation(e) {
-            var latlng = e.latlng;
-
-            if (currentMarker) {
-                map.removeLayer(currentMarker);
-            }
-
-            currentMarker = L.marker(latlng).addTo(map)
-                .bindPopup("You are here: " + latlng.toString())
-                .openPopup();
-
-            map.setView(latlng, 16);
+        // Update Location Info Box
+        function updateLocationInfo(latlng, accuracy) {
+            document.getElementById('locationInfo').innerHTML =
+                `Latitude: ${latlng.lat.toFixed(6)} | Longitude: ${latlng.lng.toFixed(6)} <br> Accuracy: ${accuracy} meters`;
         }
 
-        // Toggle navigation tracking
+        // Update Map Location
+        function updateLocation(e) {
+            const { latlng, accuracy } = e;
+
+            // Update Marker and Accuracy Circle
+            if (currentMarker) map.removeLayer(currentMarker);
+            if (accuracyCircle) map.removeLayer(accuracyCircle);
+
+            currentMarker = L.marker(latlng).addTo(map)
+                .bindPopup(`You are here`).openPopup();
+
+            accuracyCircle = L.circle(latlng, { radius: accuracy }).addTo(map);
+
+            updateLocationInfo(latlng, accuracy);
+
+            if (autoFollow) {
+                map.setView(latlng, 16);
+            }
+        }
+
+        // Toggle Navigation Tracking
         document.getElementById('navigateButton').addEventListener('click', function () {
             tracking = !tracking;
+            this.textContent = tracking ? "Stop Navigation" : "Start Navigation";
+
             if (tracking) {
-                map.locate({ setView: true, watch: true, maxZoom: 16, enableHighAccuracy: true });
-                this.textContent = "Stop Navigation";
+                map.locate({ setView: autoFollow, watch: true, enableHighAccuracy: true });
             } else {
                 map.stopLocate();
-                this.textContent = "Start Navigation";
+                if (currentMarker) map.removeLayer(currentMarker);
+                if (accuracyCircle) map.removeLayer(accuracyCircle);
+                document.getElementById('locationInfo').innerHTML = "No location data available.";
             }
         });
 
-        // Handle location updates and errors
-        map.on('locationfound', updateLocation);
-        map.on('locationerror', function () {
-            alert("Unable to access your location.");
+        // Toggle Auto-Follow
+        document.getElementById('followToggle').addEventListener('click', function () {
+            autoFollow = !autoFollow;
+            this.textContent = `Auto-Follow: ${autoFollow ? "On" : "Off"}`;
         });
+
+        // Handle Location Errors
+        map.on('locationerror', function (e) {
+            alert("Location access denied or unavailable.");
+            document.getElementById('locationInfo').innerHTML = "Location access error.";
+        });
+
+        map.on('locationfound', updateLocation);
     </script>
 </body>
 </html>
