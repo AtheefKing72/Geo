@@ -3,207 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Location Navigator with Auto-Complete & Geolocation</title>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4487648195542576"
-    crossorigin="anonymous"></script>
-    <!-- Leaflet CSS for Maps -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <!-- Leaflet GeoSearch CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch/dist/geosearch.css" />
-    <!-- Custom Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <title>Live Location Navigator</title>
 
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         body {
-            font-family: 'Roboto', sans-serif;
+            font-family: Arial, sans-serif;
             margin: 0;
+            padding: 0;
             text-align: center;
-            background-color: #f3f4f6;
-        }
-        header {
-            background-color: #4CAF50;
-            color: white;
-            padding: 20px;
-        }
-        main {
-            padding: 10px;
         }
         #map {
-            width: 100%;
             height: 600px;
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-        .controls {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 10px;
-        }
-        .control-button, .control-select, .search-input {
-            padding: 10px;
-            font-size: 16px;
-            border-radius: 5px;
-            cursor: pointer;
+            width: 100%;
+            margin: 20px auto;
         }
         .control-button {
-            background-color: #007BFF;
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: #4CAF50;
             color: white;
             border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
         }
         .control-button:hover {
-            background-color: #0056b3;
-        }
-        .search-input {
-            width: 300px;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        .info-box {
-            margin-top: 15px;
-            font-size: 14px;
-            padding: 10px;
-            background-color: #f3f3f3;
-            border-radius: 5px;
+            background-color: #45a049;
         }
     </style>
 </head>
-
 <body>
-    <header>
-        <h1>Advanced Location Navigator</h1>
-        <p>Track your live location, search any place, and switch between map styles.</p>
-    </header>
-
-    <main>
-        <div class="controls">
-            <button id="navigateButton" class="control-button">Start Navigation</button>
-            <button id="followToggle" class="control-button">Auto-Follow: Off</button>
-            <label for="mapStyleSelect">Select Map Style:</label>
-<select id="mapStyleSelect" class="control-select">
-    <option value="street">Street View</option>
-    <option value="satellite">Satellite View</option>
-</select>
-
-        </div>
-        <input type="text" id="searchLocation" class="search-input" placeholder="Search location..." />
-
-        <div id="map"></div>
-        <div class="info-box" id="locationInfo">No location data available.</div>
-    </main>
+    <h1>Live Location Navigator</h1>
+    <button id="navigateButton" class="control-button">Start Navigation</button>
+    <div id="map"></div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <!-- Leaflet GeoSearch JS -->
-    <script src="https://unpkg.com/leaflet-geosearch/dist/geosearch.umd.js"></script>
-
     <script>
-        // Initialize Map
-        let map = L.map('map').setView([20, 0], 2);
-        let tracking = false, autoFollow = false;
-        let currentMarker, accuracyCircle;
+        let map = L.map('map').setView([0, 0], 13);  // Initialize map
+        let marker, accuracyCircle;
+        let isNavigating = false;
 
-        // Base Layers for Street and Satellite View
-        let streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        let satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-            attribution: '&copy; Google Satellite Imagery'
-        });
+        // Start navigation when the button is clicked
+        document.getElementById('navigateButton').addEventListener('click', function () {
+            isNavigating = !isNavigating;
+            this.textContent = isNavigating ? "Stop Navigation" : "Start Navigation";
 
-        // Map Style Toggle
-        document.getElementById('mapStyleSelect').addEventListener('change', function () {
-            if (this.value === 'satellite') {
-                map.removeLayer(streetLayer);
-                map.addLayer(satelliteLayer);
+            if (isNavigating) {
+                // Start watching position
+                if (navigator.geolocation) {
+                    navigator.geolocation.watchPosition(updateMap, handleError, {
+                        enableHighAccuracy: true
+                    });
+                } else {
+                    alert("Geolocation is not supported by your browser.");
+                }
             } else {
-                map.removeLayer(satelliteLayer);
-                map.addLayer(streetLayer);
+                // Stop navigation (remove marker and reset map view)
+                map.setView([0, 0], 2);
+                if (marker) map.removeLayer(marker);
+                if (accuracyCircle) map.removeLayer(accuracyCircle);
             }
         });
 
-        // Update Location Info
-        function updateLocationInfo(latlng, accuracy) {
-            document.getElementById('locationInfo').innerHTML =
-                `Latitude: ${latlng.lat.toFixed(6)} | Longitude: ${latlng.lng.toFixed(6)} | Accuracy: ${accuracy} meters`;
-        }
+        // Update map position based on geolocation
+        function updateMap(position) {
+            const { latitude, longitude, accuracy } = position.coords;
 
-        // Update Map Location
-        function updateLocation(e) {
-            const { latlng, accuracy } = e;
-
-            if (currentMarker) map.removeLayer(currentMarker);
+            // Remove existing marker and accuracy circle before updating
+            if (marker) map.removeLayer(marker);
             if (accuracyCircle) map.removeLayer(accuracyCircle);
 
-            currentMarker = L.marker(latlng).addTo(map)
-                .bindPopup(`You are here`).openPopup();
+            // Add marker at current location
+            marker = L.marker([latitude, longitude]).addTo(map)
+                .bindPopup("You are here").openPopup();
 
-            accuracyCircle = L.circle(latlng, { radius: accuracy }).addTo(map);
+            // Add accuracy circle around current location
+            accuracyCircle = L.circle([latitude, longitude], {
+                radius: accuracy,
+                color: '#007bff',
+                fillColor: '#007bff',
+                fillOpacity: 0.2
+            }).addTo(map);
 
-            updateLocationInfo(latlng, accuracy);
-
-            if (autoFollow) {
-                map.setView(latlng, 16);
-            }
+            // Center the map on the new location
+            map.setView([latitude, longitude], 16);
         }
 
-        // Toggle Navigation
-        document.getElementById('navigateButton').addEventListener('click', function () {
-            tracking = !tracking;
-            this.textContent = tracking ? "Stop Navigation" : "Start Navigation";
-
-            if (tracking) {
-                map.locate({ setView: autoFollow, watch: true, enableHighAccuracy: true });
-            } else {
-                map.stopLocate();
-                if (currentMarker) map.removeLayer(currentMarker);
-                if (accuracyCircle) map.removeLayer(accuracyCircle);
-                document.getElementById('locationInfo').innerHTML = "No location data available.";
-            }
-        });
-
-        // Toggle Auto-Follow
-        document.getElementById('followToggle').addEventListener('click', function () {
-            autoFollow = !autoFollow;
-            this.textContent = `Auto-Follow: ${autoFollow ? "On" : "Off"}`;
-        });
-
-        // Handle Location Errors
-        map.on('locationerror', function () {
-            alert("Location access denied or unavailable.");
-            document.getElementById('locationInfo').innerHTML = "Location access error.";
-        });
-
-        map.on('locationfound', updateLocation);
-
-        // Auto-Complete Search Setup
-        const provider = new GeoSearch.OpenStreetMapProvider();
-        const searchControl = new GeoSearch.GeoSearchControl({
-            provider: provider,
-            style: 'bar',
-            autoComplete: true,
-            autoCompleteDelay: 300,
-            showMarker: true,
-            marker: {
-                icon: new L.Icon.Default(),
-                draggable: false,
-            }
-        });
-        map.addControl(searchControl);
-
-        // Show markers for search results
-        map.on('geosearch/showlocation', (result) => {
-            if (currentMarker) map.removeLayer(currentMarker);
-            currentMarker = L.marker([result.location.y, result.location.x])
-                .addTo(map)
-                .bindPopup(result.location.label)
-                .openPopup();
-        });
+        // Handle errors from the geolocation API
+        function handleError(error) {
+            alert("Error obtaining location: " + error.message);
+        }
     </script>
 </body>
 </html>
