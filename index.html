@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Location Navigator</title>
-   
+
     <!-- Leaflet Map CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-   
+
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -34,18 +33,23 @@
         .control-button:hover {
             background-color: #45a049;
         }
+        #locationInfo {
+            font-size: 14px;
+            color: #555;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
-    
     <h1>Live Location Navigator</h1>
     <button id="navigateButton" class="control-button">Start Navigation</button>
     <div id="map"></div>
+    <div id="locationInfo">No location data available.</div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-        let map = L.map('map').setView([0, 0], 13);  // Initialize map
+        let map = L.map('map').setView([0, 0], 13); // Initialize map
         let marker, accuracyCircle;
         let isNavigating = false;
 
@@ -70,9 +74,10 @@
                 }
             } else {
                 // Stop navigation (remove marker and reset map view)
-                map.setView([0, 0], 2);
                 if (marker) map.removeLayer(marker);
                 if (accuracyCircle) map.removeLayer(accuracyCircle);
+                map.setView([0, 0], 2);
+                document.getElementById('locationInfo').textContent = "No location data available.";
             }
         });
 
@@ -98,6 +103,10 @@
 
             // Center the map on the new location
             map.setView([latitude, longitude], 16);
+
+            // Update location info
+            document.getElementById('locationInfo').textContent = 
+                `Latitude: ${latitude.toFixed(6)} | Longitude: ${longitude.toFixed(6)} | Accuracy: ${accuracy.toFixed(2)} meters`;
         }
 
         // Handle errors from the geolocation API
@@ -105,6 +114,5 @@
             alert("Error obtaining location: " + error.message);
         }
     </script>
-    
 </body>
 </html>
