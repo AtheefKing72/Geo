@@ -1,62 +1,96 @@
-// Initialize the map with a global view
-var map = L.map('map').setView([20, 0], 2);
+// Initialize map with better performance settings
+let map = L.map('map', {
+    center: [20, 0],
+    zoom: 2,
+    zoomAnimation: true,
+    markerZoomAnimation: true,
+    inertia: true,
+    worldCopyJump: true
+});
 
-// Base layers for street and satellite views
-var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
+// Add street map layer by default
+let streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    detectRetina: true, // Improve map performance for high DPI displays
 }).addTo(map);
 
-var satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+let satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-    maxZoom: 19,
-    attribution: '&copy; Google Maps Satellite'
+    detectRetina: true,
+    attribution: '&copy; Google Satellite Imagery'
 });
 
-// Map style toggle functionality
+// Switch between street and satellite view efficiently
 document.getElementById('mapStyleSelect').addEventListener('change', function () {
-    if (this.value === 'satellite') {
-        map.removeLayer(streetLayer);
-        map.addLayer(satelliteLayer);
-    } else {
-        map.removeLayer(satelliteLayer);
-        map.addLayer(streetLayer);
-    }
+    map.eachLayer(layer => map.removeLayer(layer));
+    (this.value === 'satellite' ? satelliteLayer : streetLayer).addTo(map);
 });
 
-// Navigation tracking control variables
-var tracking = false;
-var currentMarker;
+// Toggle location tracking with smoother handling
+let tracking = false;
+let autoFollow = false;
+let currentMarker, accuracyCircle;
 
-// Function to update location on the map
 function updateLocation(e) {
-    var latlng = e.latlng;
+    const { latlng, accuracy } = e;
 
-    if (currentMarker) {
-        map.removeLayer(currentMarker);
+    // Use a single marker for performance
+    if (!currentMarker) {
+        currentMarker = L.marker(latlng).addTo(map);
+    } else {
+        currentMarker.setLatLng(latlng);
     }
 
-    currentMarker = L.marker(latlng).addTo(map)
-        .bindPopup("You are here: " + latlng.toString())
-        .openPopup();
+    // Handle accuracy display efficiently
+    if (!accuracyCircle) {
+        accuracyCircle = L.circle(latlng, { radius: accuracy }).addTo(map);
+    } else {
+        accuracyCircle.setLatLng(latlng).setRadius(accuracy);
+    }
 
-    map.setView(latlng, 16);
+    // Auto-follow map updates if enabled
+    if (autoFollow) {
+        map.setView(latlng, 16, { animate: true });
+    }
+
+    document.getElementById('locationInfo').textContent =
+        `Lat: ${latlng.lat.toFixed(6)} | Lng: ${latlng.lng.toFixed(6)} | Accuracy: ${accuracy.toFixed(2)}m`;
 }
 
-// Toggle navigation tracking
+// Smooth search with debounced input handling
+let debounceTimeout;
+document.getElementById('searchLocation').addEventListener('input', function () {
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(() => performSearch(this.value), 300);
+});
+
+function performSearch(query) {
+    if (!query.trim()) return;
+    L.Control.geocoder().geocode(query, function (results) {
+        if (results.length) {
+            map.fitBounds(L.latLngBounds(results[0].bbox));
+            if (currentMarker) map.removeLayer(currentMarker);
+            currentMarker = L.marker(results[0].center).addTo(map)
+                .bindPopup(results[0].name).openPopup();
+        }
+    });
+}
+
+// Event listener to start/stop location tracking
 document.getElementById('navigateButton').addEventListener('click', function () {
     tracking = !tracking;
+    this.textContent = tracking ? 'Stop Navigation' : 'Start Navigation';
+
     if (tracking) {
-        map.locate({ setView: true, watch: true, maxZoom: 16, enableHighAccuracy: true });
-        this.textContent = "Stop Navigation";
+        map.locate({ setView: true, watch: true, enableHighAccuracy: true });
     } else {
         map.stopLocate();
-        this.textContent = "Start Navigation";
+        map.removeLayer(currentMarker);
+        map.removeLayer(accuracyCircle);
     }
 });
 
-// Handle location updates and errors
+// Enable smoother interactions and animations
+L.Control.geocoder().addTo(map);
 map.on('locationfound', updateLocation);
-map.on('locationerror', function () {
-    alert("Unable to access your location.");
-});
+map.on('locationerror', () => alert("Unable to access location."));
