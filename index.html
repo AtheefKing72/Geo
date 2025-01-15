@@ -4,10 +4,13 @@
     <meta name="google-adsense-account" content="ca-pub-4487648195542576">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Global Navigator - Real-Time Location Tracker</title>
+    <title>Advanced Location Navigator with Search & Satellite View</title>
 
     <!-- Leaflet CSS for Maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+    <!-- Leaflet Search Plugin CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
 
     <!-- Custom Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
@@ -41,7 +44,7 @@
             gap: 15px;
             margin-bottom: 10px;
         }
-        .control-button, .control-select {
+        .control-button, .control-select, .search-input {
             padding: 10px;
             font-size: 16px;
             border-radius: 5px;
@@ -53,6 +56,13 @@
         }
         .control-button:hover {
             background-color: #0056b3;
+        }
+        .search-input {
+            width: 300px;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
         }
         .info-box {
             margin-top: 15px;
@@ -66,42 +76,67 @@
 
 <body>
     <header>
-        <h1>Advanced Global Navigator</h1>
-        <p>Track your live location and explore enhanced features.</p>
+        <h1>Advanced Location Navigator</h1>
+        <p>Track your live location and search any place in the world.</p>
     </header>
 
     <main>
         <div class="controls">
             <button id="navigateButton" class="control-button">Start Navigation</button>
             <button id="followToggle" class="control-button">Auto-Follow: Off</button>
+            <select id="mapStyleSelect" class="control-select" aria-label="Select Map Style">
+                <option value="street">Street View</option>
+                <option value="satellite">Satellite View</option>
+            </select>
         </div>
+        <input type="text" id="searchLocation" class="search-input" placeholder="Search location..." />
+
         <div id="map"></div>
         <div class="info-box" id="locationInfo">No location data available.</div>
     </main>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <!-- Leaflet Geocoder for Search Functionality -->
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
     <script>
         let map = L.map('map').setView([20, 0], 2);
         let tracking = false, autoFollow = false;
         let currentMarker, accuracyCircle;
 
-        // Base Layers
+        // Base Layers for Street and Satellite View
         let streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Update Location Info Box
+        let satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Satellite Imagery'
+        });
+
+        // Map Style Toggle
+        document.getElementById('mapStyleSelect').addEventListener('change', function () {
+            if (this.value === 'satellite') {
+                map.removeLayer(streetLayer);
+                map.addLayer(satelliteLayer);
+            } else {
+                map.removeLayer(satelliteLayer);
+                map.addLayer(streetLayer);
+            }
+        });
+
+        // Update Location Info
         function updateLocationInfo(latlng, accuracy) {
             document.getElementById('locationInfo').innerHTML =
-                `Latitude: ${latlng.lat.toFixed(6)} | Longitude: ${latlng.lng.toFixed(6)} <br> Accuracy: ${accuracy} meters`;
+                `Latitude: ${latlng.lat.toFixed(6)} | Longitude: ${latlng.lng.toFixed(6)} | Accuracy: ${accuracy} meters`;
         }
 
         // Update Map Location
         function updateLocation(e) {
             const { latlng, accuracy } = e;
 
-            // Update Marker and Accuracy Circle
             if (currentMarker) map.removeLayer(currentMarker);
             if (accuracyCircle) map.removeLayer(accuracyCircle);
 
@@ -117,7 +152,7 @@
             }
         }
 
-        // Toggle Navigation Tracking
+        // Toggle Navigation
         document.getElementById('navigateButton').addEventListener('click', function () {
             tracking = !tracking;
             this.textContent = tracking ? "Stop Navigation" : "Start Navigation";
@@ -139,12 +174,26 @@
         });
 
         // Handle Location Errors
-        map.on('locationerror', function (e) {
+        map.on('locationerror', function () {
             alert("Location access denied or unavailable.");
             document.getElementById('locationInfo').innerHTML = "Location access error.";
         });
 
         map.on('locationfound', updateLocation);
+
+        // Add Geocoder (Search Location)
+        let geocoder = L.Control.geocoder({
+            defaultMarkGeocode: false
+        })
+            .on('markgeocode', function (e) {
+                let bbox = e.geocode.bbox;
+                let bounds = L.latLngBounds(bbox.getSouthWest(), bbox.getNorthEast());
+                map.fitBounds(bounds);
+                if (currentMarker) map.removeLayer(currentMarker);
+                currentMarker = L.marker(e.geocode.center).addTo(map)
+                    .bindPopup(e.geocode.name).openPopup();
+            })
+            .addTo(map);
     </script>
 </body>
 </html>
